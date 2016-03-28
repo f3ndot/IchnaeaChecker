@@ -59,12 +59,7 @@ import cz.msebera.android.httpclient.Header;
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
-    private CellLocation mCellLocation;
-    private int mPhoneType;
-    private int mNetworkType;
-    private int mMCC;
-    private int mMNC;
-    private List<CellInfo> mVisibleCells;
+    private List<GeneralCellInfo> mVisibleCells;
     private List<GeneralCellInfo> mRegisteredCells = new ArrayList<>();
 
     @Override
@@ -140,32 +135,20 @@ public class MainActivity extends AppCompatActivity {
         if (tmPermCheck == PackageManager.PERMISSION_GRANTED) {
             TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && tm.getAllCellInfo() != null) {
-                mVisibleCells = tm.getAllCellInfo();
+                mVisibleCells = GeneralCellInfoFactory.getInstances(tm.getAllCellInfo());
                 mRegisteredCells.clear();
                 if (mVisibleCells.size() == 0) {
                     Log.w(TAG, "setCellInfo: No visible cells (primary or neighbours), unable to do anything");
                 }
-                for (CellInfo cell : mVisibleCells) {
+                for (GeneralCellInfo cell : mVisibleCells) {
                     Log.i(TAG, "Device aware of " + cell.toString());
                     if (cell.isRegistered()) {
-                        mRegisteredCells.add(GeneralCellInfoFactory.getInstance(cell));
+                        mRegisteredCells.add(cell);
                     }
                 }
             } else {
-                Log.i(TAG, "setCellInfo: Android device too old to use getAllCellInfo(), falling back to getCellLocation()");
+                Log.e(TAG, "setCellInfo: Android device too old to use getAllCellInfo(), need to implement getCellLocation() fallback!");
             }
-
-            mCellLocation = tm.getCellLocation();
-            if (mCellLocation == null) {
-                // TODO null check cell location has last reset and CDMA fallbacks
-            }
-            mPhoneType = tm.getPhoneType();
-            mNetworkType = tm.getNetworkType();
-            // TODO guard against CDMA and apply fallback
-            String networkOperator = tm.getNetworkOperator();
-            mMCC = Integer.parseInt(networkOperator.substring(0, 3));
-            mMNC = Integer.parseInt(networkOperator.substring(3));
-
         } else if (tmPermCheck == PackageManager.PERMISSION_DENIED) {
             if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                     android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
@@ -194,18 +177,13 @@ public class MainActivity extends AppCompatActivity {
                 }
             });
         }
-        GeneralCellInfo cell = mRegisteredCells.get(0);
+        final GeneralCellInfo cell = mRegisteredCells.get(0);
         Log.i(TAG, "getIchnaeaLookup: Looking up " + cell);
-//        TODO implement fallback
-//        int cellId = ((GsmCellLocation) mCellLocation).getCid();
-//        int lac = ((GsmCellLocation) mCellLocation).getLac();
-        return IchnaeaRestClient.geolocate(cell.cellType, cell.mobileCountryCode,
-                cell.mobileNetworkCode, cell.areaCode, cell.cellIdentity, cell.getDbmStrength(),
-                new JsonHttpResponseHandler() {
+        return IchnaeaRestClient.geolocate(cell, new JsonHttpResponseHandler() {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                 try {
-                    Log.i(TAG, "onSuccess: You did it! Location is: " + response.get("location"));
+                    Log.i(TAG, "onSuccess: Cell in database! Location is: " + response.get("location") + " for " + cell);
                     Toast.makeText(MainActivity.this, "Cell in Ichnaea database!", Toast.LENGTH_LONG).show();
                     TextView text = (TextView) findViewById(R.id.topLevelText);
                     assert text != null;
@@ -229,11 +207,23 @@ public class MainActivity extends AppCompatActivity {
             }
 
             @Override
+            public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
+                try {
+                    if (statusCode == 404 && errorResponse.getJSONObject("error").getInt("code") == 404) {
+                        Log.i(TAG, "onFailure: Cell is not in database: " + cell);
+                    } else {
+                        Toast.makeText(MainActivity.this, "Unknown error occurred", Toast.LENGTH_SHORT).show();
+                    }
+                } catch (JSONException e) {
+                    Toast.makeText(MainActivity.this, "Unknown error occurred", Toast.LENGTH_SHORT).show();
+                    e.printStackTrace();
+                }
+            }
+
+            @Override
             public void onCancel() {
                 super.onCancel();
-                snack.setText("Request cancelled!");
-                snack.setDuration(Snackbar.LENGTH_LONG);
-                snack.show();
+                snack.dismiss();
             }
         });
     }

@@ -57,6 +57,19 @@ public class IchnaeaRestClient {
     private static AsyncHttpClient client = new AsyncHttpClient();
 
     /**
+     * Determine if cell is in Mozilla Location Service (MLS/Ichnaea) database
+     *
+     * @see #geolocate(String, int, int, int, int, int, AsyncHttpResponseHandler)
+     * @param cell
+     * @return
+     */
+    public static RequestHandle geolocate(GeneralCellInfo cell, AsyncHttpResponseHandler responseHandler) {
+        return geolocate(cell.getCellType(), cell.getMobileCountryCode(),
+                cell.getMobileNetworkCode(), cell.getAreaCode(), cell.getCellIdentity(),
+                cell.getDbmStrength(), responseHandler);
+    }
+
+    /**
      * A partially implemented call to Geolocate API.
      *
      * Attempts to find the lat/lng location

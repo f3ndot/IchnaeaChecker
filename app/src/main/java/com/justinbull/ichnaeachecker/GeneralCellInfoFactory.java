@@ -24,13 +24,26 @@
 
 package com.justinbull.ichnaeachecker;
 
+import android.support.annotation.NonNull;
 import android.telephony.CellInfo;
 import android.telephony.CellInfoCdma;
 import android.telephony.CellInfoGsm;
 import android.telephony.CellInfoLte;
 import android.telephony.CellInfoWcdma;
+import android.telephony.TelephonyManager;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class GeneralCellInfoFactory {
+    /**
+     * Given a subclass of {@link CellInfo}, return a {@link GeneralCellInfo} representation, which
+     * has a standard interface to access the various fields of differing cell network types (LTE,
+     * GSM, WCDMA)
+     *
+     * @param cell Any CellInfo subclass, e.g. CellInfoLte
+     * @return The GeneralCellInfo equivalent
+     */
     public static GeneralCellInfo getInstance(CellInfo cell) {
         if (cell instanceof CellInfoLte) {
             return new GeneralCellInfo((CellInfoLte) cell);
@@ -45,5 +58,21 @@ public class GeneralCellInfoFactory {
             return new GeneralCellInfo((CellInfoCdma) cell);
         }
         return null;
+    }
+
+    /**
+     * Given a list of {@link CellInfo} implemented objects from {@link TelephonyManager#getAllCellInfo()}
+     * return an equivalent list of {@link GeneralCellInfo} which has a standard interface to access
+     * the various fields of differing cell network types (LTE, GSM, WCDMA)
+     *
+     * @param cells List of CellInfo-implementing objects
+     * @return A list of GeneralCellInfo objects
+     */
+    public static List<GeneralCellInfo> getInstances(List<CellInfo> cells) {
+        ArrayList<GeneralCellInfo> generalCells = new ArrayList<GeneralCellInfo>();
+        for (CellInfo cell : cells) {
+            generalCells.add(getInstance(cell));
+        }
+        return generalCells;
     }
 }

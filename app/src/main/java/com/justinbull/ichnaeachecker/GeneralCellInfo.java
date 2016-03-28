@@ -29,7 +29,6 @@ import android.os.Build;
 import android.telephony.CellIdentityGsm;
 import android.telephony.CellIdentityLte;
 import android.telephony.CellIdentityWcdma;
-import android.telephony.CellInfo;
 import android.telephony.CellInfoCdma;
 import android.telephony.CellInfoGsm;
 import android.telephony.CellInfoLte;
@@ -56,63 +55,117 @@ public class GeneralCellInfo {
     public static final String NETWORK_TYPE_WCDMA = "WCDMA";
     public static final String NETWORK_TYPE_CDMA = "CDMA";
 
-    public String cellType; // LTE, GSM, WCDMA, or CDMA
-    public int cellIdentity; // aka CID (GSM, WCDMA) or CI (LTE)
-    public int mobileCountryCode;
-    public int mobileNetworkCode;
-    public int scramblingCode; // aka PSC (GSM, WCDMA) or PCI (LTE)
-    public int areaCode; // aka LAC (GSM, WCDMA) or TAC (LTE)
-    public CellSignalStrength strength;
+    protected String mCellType; // LTE, GSM, WCDMA, or CDMA
+    protected boolean mIsRegistered;
+    protected int mCellIdentity; // aka CID (GSM, WCDMA) or CI (LTE)
+    protected int mMobileCountryCode;
+    protected int mMobileNetworkCode;
+    protected int mScramblingCode; // aka PSC (GSM, WCDMA) or PCI (LTE)
+    protected int mAreaCode; // aka LAC (GSM, WCDMA) or TAC (LTE)
+    protected CellSignalStrength mStrength;
 
-    public GeneralCellInfo(String cellType, int cellIdentity, int mobileCountryCode, int mobileNetworkCode, int scramblingCode, int areaCode, CellSignalStrength strength) {
-        this.cellType = cellType;
-        this.cellIdentity = cellIdentity;
-        this.mobileCountryCode = mobileCountryCode;
-        this.mobileNetworkCode = mobileNetworkCode;
-        this.scramblingCode = scramblingCode;
-        this.areaCode = areaCode;
-        this.strength = strength;
+    public GeneralCellInfo(String cellType, boolean isRegistered, int cellIdentity, int mobileCountryCode, int mobileNetworkCode, int scramblingCode, int areaCode, CellSignalStrength strength) {
+        mCellType = cellType;
+        mIsRegistered = isRegistered;
+        mCellIdentity = cellIdentity;
+        mMobileCountryCode = mobileCountryCode;
+        mMobileNetworkCode = mobileNetworkCode;
+        mScramblingCode = scramblingCode;
+        mAreaCode = areaCode;
+        mStrength = strength;
     }
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
     public GeneralCellInfo(CellInfoLte cell) {
         CellIdentityLte identity = cell.getCellIdentity();
-        cellType = NETWORK_TYPE_LTE;
-        cellIdentity = identity.getCi();
-        mobileCountryCode = identity.getMcc();
-        mobileNetworkCode = identity.getMnc();
-        scramblingCode = identity.getPci();
-        areaCode = identity.getTac();
-        strength = cell.getCellSignalStrength();
+        mCellType = NETWORK_TYPE_LTE;
+        mIsRegistered = cell.isRegistered();
+        mCellIdentity = identity.getCi();
+        mMobileCountryCode = identity.getMcc();
+        mMobileNetworkCode = identity.getMnc();
+        mScramblingCode = identity.getPci();
+        mAreaCode = identity.getTac();
+        mStrength = cell.getCellSignalStrength();
     }
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR1)
     public GeneralCellInfo(CellInfoGsm cell) {
         CellIdentityGsm identity = cell.getCellIdentity();
-        cellType = NETWORK_TYPE_GSM;
-        cellIdentity = identity.getCid();
-        mobileCountryCode = identity.getMcc();
-        mobileNetworkCode = identity.getMnc();
-        scramblingCode = Integer.MAX_VALUE; // GSM doesn't have scrambling codes
-        areaCode = identity.getLac();
-        strength = cell.getCellSignalStrength();
+        mCellType = NETWORK_TYPE_GSM;
+        mIsRegistered = cell.isRegistered();
+        mCellIdentity = identity.getCid();
+        mMobileCountryCode = identity.getMcc();
+        mMobileNetworkCode = identity.getMnc();
+        mScramblingCode = Integer.MAX_VALUE; // GSM doesn't have scrambling codes
+        mAreaCode = identity.getLac();
+        mStrength = cell.getCellSignalStrength();
     }
 
     @TargetApi(Build.VERSION_CODES.JELLY_BEAN_MR2)
     public GeneralCellInfo(CellInfoWcdma cell) {
         CellIdentityWcdma identity = cell.getCellIdentity();
-        cellType = NETWORK_TYPE_WCDMA;
-        cellIdentity = identity.getCid();
-        mobileCountryCode = identity.getMcc();
-        mobileNetworkCode = identity.getMnc();
-        scramblingCode = identity.getPsc();
-        areaCode = identity.getLac();
-        strength = cell.getCellSignalStrength();
+        mCellType = NETWORK_TYPE_WCDMA;
+        mIsRegistered = cell.isRegistered();
+        mCellIdentity = identity.getCid();
+        mMobileCountryCode = identity.getMcc();
+        mMobileNetworkCode = identity.getMnc();
+        mScramblingCode = identity.getPsc();
+        mAreaCode = identity.getLac();
+        mStrength = cell.getCellSignalStrength();
     }
 
     public GeneralCellInfo(CellInfoCdma cell) {
         throw new UnsupportedOperationException("CDMA is not supported yet");
     }
+
+    public String getCellType() {
+        return mCellType;
+    }
+
+    public boolean isRegistered() {
+        return mIsRegistered;
+    }
+
+    public int getCellIdentity() {
+        return mCellIdentity;
+    }
+
+    public boolean isIdentityKnown() {
+        return getCellIdentity() != Integer.MAX_VALUE;
+    }
+
+    public int getMobileCountryCode() {
+        return mMobileCountryCode;
+    }
+
+    public boolean isMCCKnown() {
+        return getMobileCountryCode() != Integer.MAX_VALUE;
+    }
+
+    public int getMobileNetworkCode() {
+        return mMobileNetworkCode;
+    }
+
+    public boolean isMNCKnown() {
+        return getMobileNetworkCode() != Integer.MAX_VALUE;
+    }
+
+    public int getScramblingCode() {
+        return mScramblingCode;
+    }
+
+    public boolean isScramblingCodeKnown() {
+        return hasScramblingCode();
+    }
+
+    public int getAreaCode() {
+        return mAreaCode;
+    }
+
+    public boolean isAreaCodeKnown() {
+        return getAreaCode() != Integer.MAX_VALUE;
+    }
+
 
     /**
      * GSM networks don't have a Primary Scrambling Code (PSC) even though standards describe it.
@@ -121,15 +174,23 @@ public class GeneralCellInfo {
      * @return false if there is no PSC
      */
     public boolean hasScramblingCode() {
-        return scramblingCode == Integer.MAX_VALUE;
+        return mScramblingCode == Integer.MAX_VALUE;
+    }
+
+    public CellSignalStrength getStrength() {
+        return mStrength;
+    }
+
+    public boolean isStrengthKnown() {
+        return getDbmStrength() != Integer.MAX_VALUE;
     }
 
     public int getDbmStrength() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
-            if (strength == null) {
+            if (mStrength == null) {
                 return Integer.MAX_VALUE;
             }
-            return strength.getDbm();
+            return mStrength.getDbm();
         }
         Log.e(TAG, "getDbmStrength: Unable to get Dbm strength because SDK too low");
         return Integer.MAX_VALUE;
@@ -137,15 +198,17 @@ public class GeneralCellInfo {
 
     @Override
     public String toString() {
+        final String unknown = "(UNKNOWN)";
         StringBuffer sb = new StringBuffer();
         sb.append("Cell:{");
-        sb.append("Type=").append(cellType).append(" ");
-        sb.append("CI/CID=").append(cellIdentity).append(" ");
-        sb.append("MCC=").append(mobileCountryCode).append(" ");
-        sb.append("MNC=").append(mobileNetworkCode).append(" ");
-        sb.append("PSC/PCI=").append(scramblingCode).append(" ");
-        sb.append("LAC/TAC=").append(areaCode).append(" ");
-        sb.append("Dbm=").append(getDbmStrength());
+        sb.append("isRegistered=").append(Boolean.toString(isRegistered())).append(" ");
+        sb.append("Type=").append(mCellType).append(" ");
+        sb.append("CI/CID=").append(isIdentityKnown() ? mCellIdentity : unknown).append(" ");
+        sb.append("MCC=").append(isMCCKnown() ? mMobileCountryCode : unknown).append(" ");
+        sb.append("MNC=").append(isMNCKnown() ? mMobileNetworkCode: unknown).append(" ");
+        sb.append("PSC/PCI=").append(isScramblingCodeKnown() ? mScramblingCode : unknown).append(" ");
+        sb.append("LAC/TAC=").append(isAreaCodeKnown() ? mAreaCode: unknown).append(" ");
+        sb.append("Dbm=").append(isStrengthKnown() ? getDbmStrength() : unknown);
         sb.append("}");
         return sb.toString();
     }
