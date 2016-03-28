@@ -211,6 +211,15 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     if (statusCode == 404 && errorResponse.getJSONObject("error").getInt("code") == 404) {
                         Log.i(TAG, "onFailure: Cell is not in database: " + cell);
+                        TextView text = (TextView) findViewById(R.id.topLevelText);
+                        assert text != null;
+                        text.setText("NOT IN DATABASE!");
+                        TextView textLat = (TextView) findViewById(R.id.latitudeText);
+                        TextView textLng = (TextView) findViewById(R.id.longitudeText);
+                        TextView textAcurracy = (TextView) findViewById(R.id.accuracyText);
+                        textLat.setVisibility(View.INVISIBLE);
+                        textLng.setVisibility(View.INVISIBLE);
+                        textAcurracy.setVisibility(View.INVISIBLE);
                     } else {
                         Toast.makeText(MainActivity.this, "Unknown error occurred", Toast.LENGTH_SHORT).show();
                     }
