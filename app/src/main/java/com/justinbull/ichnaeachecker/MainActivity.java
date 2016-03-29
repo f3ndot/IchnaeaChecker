@@ -24,6 +24,7 @@
 
 package com.justinbull.ichnaeachecker;
 
+import android.app.Dialog;
 import android.content.Context;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
@@ -40,6 +41,11 @@ import android.util.Log;
 import android.view.View;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.widget.AbsListView;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListAdapter;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -61,6 +67,9 @@ public class MainActivity extends AppCompatActivity {
 
     private List<GeneralCellInfo> mVisibleCells;
     private List<GeneralCellInfo> mRegisteredCells = new ArrayList<>();
+    private ListAdapter mCellListAdapter;
+    private ListView mCellListView;
+    private GeneralCellInfo mSelectedCell;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -69,6 +78,24 @@ public class MainActivity extends AppCompatActivity {
         Toolbar toolbar = (Toolbar) findViewById(R.id.toolbar);
         setSupportActionBar(toolbar);
         setCellInfo();
+        mCellListView = (ListView) findViewById(R.id.cellListView);
+        mCellListView.setAdapter(mCellListAdapter);
+        mCellListView.setChoiceMode(AbsListView.CHOICE_MODE_SINGLE);
+        mCellListView.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
+                GeneralCellInfo cell = (GeneralCellInfo) parent.getItemAtPosition(position);
+                if (!cell.isFullyKnown()) {
+                    Snackbar snack = Snackbar.make(view, "Not enough information known about selected cell", Snackbar.LENGTH_SHORT);
+                    snack.getView().setBackgroundColor(ContextCompat.getColor(MainActivity.this, R.color.colorError));
+                    snack.show();
+                    return;
+                }
+                mSelectedCell = cell;
+                view.setSelected(true);
+                Snackbar.make(view, "Selected " + mSelectedCell.getCellType() + " Cell " + mSelectedCell.getFriendlyCellIdentity(), Snackbar.LENGTH_SHORT).show();
+            }
+        });
 
         FloatingActionButton fab = (FloatingActionButton) findViewById(R.id.fab);
         assert fab != null;
@@ -79,23 +106,35 @@ public class MainActivity extends AppCompatActivity {
                         PackageManager.PERMISSION_DENIED) {
                     setCellInfo();
                 }
+                if (mSelectedCell == null) {
+                    Toast.makeText(MainActivity.this, "Choose a cell to check", Toast.LENGTH_SHORT).show();
+                    return;
+                }
                 final Snackbar snack = Snackbar.make(view, "Checking Mozilla Location Services database...", Snackbar.LENGTH_INDEFINITE);
                 snack.show();
-                final RequestHandle handler = getIchnaeaLookup(snack);
-                assert handler != null;
-                snack.setAction("CANCEL", new View.OnClickListener() {
-                    @Override
-                    public void onClick(View view) {
-                        snack.setText("Cancelling lookup request...");
-                        if (!handler.isFinished()) {
-                            handler.cancel(true);
-                        } else {
-                            snack.setText("Request already finished!");
-                            snack.setDuration(Snackbar.LENGTH_LONG);
+                try {
+                    final RequestHandle handler = getIchnaeaLookup(snack);
+                    assert handler != null;
+                    snack.setAction("CANCEL", new View.OnClickListener() {
+                        @Override
+                        public void onClick(View view) {
+                            snack.setText("Cancelling lookup request...");
+                            if (!handler.isFinished()) {
+                                handler.cancel(true);
+                            } else {
+                                snack.setText("Request already finished!");
+                                snack.setDuration(Snackbar.LENGTH_LONG);
+                                snack.show();
+                            }
                         }
-                    }
-                })
-                        .show();
+                    })
+                            .show();
+                } catch (IllegalArgumentException e) {
+                    Log.w(TAG, "onClick: ", e);
+                    snack.setDuration(Snackbar.LENGTH_SHORT);
+                    snack.setText("Not enough information known about selected cell");
+                    snack.show();
+                }
             }
         });
     }
@@ -136,6 +175,18 @@ public class MainActivity extends AppCompatActivity {
             TelephonyManager tm = (TelephonyManager) getSystemService(Context.TELEPHONY_SERVICE);
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.JELLY_BEAN_MR1 && tm.getAllCellInfo() != null) {
                 mVisibleCells = GeneralCellInfoFactory.getInstances(tm.getAllCellInfo());
+                // Sort cells by strength
+                Collections.sort(mVisibleCells, new Comparator<GeneralCellInfo>() {
+                    @Override
+                    public int compare(GeneralCellInfo lhs, GeneralCellInfo rhs) {
+                        int lhsDbm = lhs.getAsuStrength();
+                        int rhsDbm = rhs.getAsuStrength();
+                        if (lhsDbm == rhsDbm) {
+                            return 0;
+                        }
+                        return lhsDbm > rhsDbm ? -1 : 1;
+                    }
+                });
                 mRegisteredCells.clear();
                 if (mVisibleCells.size() == 0) {
                     Log.w(TAG, "setCellInfo: No visible cells (primary or neighbours), unable to do anything");
@@ -146,9 +197,17 @@ public class MainActivity extends AppCompatActivity {
                         mRegisteredCells.add(cell);
                     }
                 }
+                if (mRegisteredCells.isEmpty()) {
+                    Log.w(TAG, "setCellInfo: No registered cells, nothing to select.");
+                    mSelectedCell = null;
+                } else {
+                    Log.i(TAG, "setCellInfo: Preselected strongest registered cell: " + mRegisteredCells.get(0));
+                    mSelectedCell = mRegisteredCells.get(0);
+                }
             } else {
                 Log.e(TAG, "setCellInfo: Android device too old to use getAllCellInfo(), need to implement getCellLocation() fallback!");
             }
+            mCellListAdapter = new ArrayAdapter<GeneralCellInfo>(this, android.R.layout.simple_list_item_1, mVisibleCells);
         } else if (tmPermCheck == PackageManager.PERMISSION_DENIED) {
             if (ActivityCompat.shouldShowRequestPermissionRationale(MainActivity.this,
                     android.Manifest.permission.ACCESS_COARSE_LOCATION)) {
@@ -163,31 +222,15 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public RequestHandle getIchnaeaLookup(final Snackbar snack) {
-        if (mRegisteredCells.size() > 1) {
-            Log.w(TAG, "getIchnaeaLookup: Registered to more than one cell, defaulting to strongest one");
-            Collections.sort(mRegisteredCells, new Comparator<GeneralCellInfo>() {
-                @Override
-                public int compare(GeneralCellInfo lhs, GeneralCellInfo rhs) {
-                    int lhsDbm = lhs.getDbmStrength();
-                    int rhsDbm = rhs.getDbmStrength();
-                    if (lhsDbm == rhsDbm) {
-                        return 0;
-                    }
-                    return lhsDbm < rhsDbm ? -1 : 1;
-                }
-            });
-        }
-        final GeneralCellInfo cell = mRegisteredCells.get(0);
-        Log.i(TAG, "getIchnaeaLookup: Looking up " + cell);
-        return IchnaeaRestClient.geolocate(cell, new JsonHttpResponseHandler() {
+        Log.i(TAG, "getIchnaeaLookup: Looking up " + mSelectedCell);
+        return IchnaeaRestClient.geolocate(mSelectedCell, new JsonHttpResponseHandler() {
             @Override
             public void onSuccess(int statusCode, Header[] headers, JSONObject response) {
                 try {
-                    Log.i(TAG, "onSuccess: Cell in database! Location is: " + response.get("location") + " for " + cell);
-                    Toast.makeText(MainActivity.this, "Cell in Ichnaea database!", Toast.LENGTH_LONG).show();
+                    Log.i(TAG, "onSuccess: Cell in database! Location is: " + response.get("location") + " for " + mSelectedCell);
                     TextView text = (TextView) findViewById(R.id.topLevelText);
                     assert text != null;
-                    text.setText("Cell in database!");
+                    text.setText("Cell " + mSelectedCell.getFriendlyCellIdentity() + " in database!");
                     TextView textLat = (TextView) findViewById(R.id.latitudeText);
                     TextView textLng = (TextView) findViewById(R.id.longitudeText);
                     TextView textAcurracy = (TextView) findViewById(R.id.accuracyText);
@@ -200,7 +243,9 @@ public class MainActivity extends AppCompatActivity {
                     textLat.setVisibility(View.VISIBLE);
                     textLng.setVisibility(View.VISIBLE);
                     textAcurracy.setVisibility(View.VISIBLE);
-                    snack.dismiss();
+                    Snackbar snackSuccess = Snackbar.make(snack.getView(), mSelectedCell.getCellType() + " Cell " + mSelectedCell.getFriendlyCellIdentity() + " in Ichnaea database!", Snackbar.LENGTH_LONG);
+                    snackSuccess.getView().setBackgroundColor(ContextCompat.getColor(MainActivity.this, R.color.colorSuccess));
+                    snackSuccess.show();
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -210,7 +255,7 @@ public class MainActivity extends AppCompatActivity {
             public void onFailure(int statusCode, Header[] headers, Throwable throwable, JSONObject errorResponse) {
                 try {
                     if (statusCode == 404 && errorResponse.getJSONObject("error").getInt("code") == 404) {
-                        Log.i(TAG, "onFailure: Cell is not in database: " + cell);
+                        Log.i(TAG, "onFailure: Cell is not in database: " + mSelectedCell);
                         TextView text = (TextView) findViewById(R.id.topLevelText);
                         assert text != null;
                         text.setText("NOT IN DATABASE!");
@@ -227,6 +272,7 @@ public class MainActivity extends AppCompatActivity {
                     Toast.makeText(MainActivity.this, "Unknown error occurred", Toast.LENGTH_SHORT).show();
                     e.printStackTrace();
                 }
+                snack.dismiss();
             }
 
             @Override

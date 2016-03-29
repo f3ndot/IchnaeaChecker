@@ -29,7 +29,7 @@
         android:id="@+id/latitudeText"
         android:layout_below="@+id/topLevelText"
         android:layout_centerHorizontal="true"
-        android:visibility="gone" />
+        android:visibility="invisible" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -39,7 +39,7 @@
         android:id="@+id/longitudeText"
         android:layout_below="@+id/latitudeText"
         android:layout_centerHorizontal="true"
-        android:visibility="gone" />
+        android:visibility="invisible" />
 
     <TextView
         android:layout_width="wrap_content"
@@ -49,5 +49,13 @@
         android:id="@+id/accuracyText"
         android:layout_below="@+id/longitudeText"
         android:layout_centerHorizontal="true"
-        android:visibility="gone"/>
+        android:visibility="invisible"/>
+
+    <ListView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/cellListView"
+        android:layout_below="@+id/accuracyText"
+        android:layout_centerHorizontal="true" />
+
 </RelativeLayout>

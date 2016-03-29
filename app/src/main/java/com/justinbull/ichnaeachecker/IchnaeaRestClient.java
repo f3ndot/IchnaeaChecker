@@ -64,6 +64,9 @@ public class IchnaeaRestClient {
      * @return
      */
     public static RequestHandle geolocate(GeneralCellInfo cell, AsyncHttpResponseHandler responseHandler) {
+        if (!cell.isFullyKnown()) {
+            throw new IllegalArgumentException("Insufficient cell information for Ichnaea lookup");
+        }
         return geolocate(cell.getCellType(), cell.getMobileCountryCode(),
                 cell.getMobileNetworkCode(), cell.getAreaCode(), cell.getCellIdentity(),
                 cell.getDbmStrength(), responseHandler);

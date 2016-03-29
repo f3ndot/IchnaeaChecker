@@ -36,6 +36,9 @@ import android.telephony.CellInfoWcdma;
 import android.telephony.CellSignalStrength;
 import android.util.Log;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Because jerks in standards bodies like to rename shit arbitrarily whe they essentially perform
  * the same function, we have this class.
@@ -54,6 +57,8 @@ public class GeneralCellInfo {
     public static final String NETWORK_TYPE_GSM = "GSM";
     public static final String NETWORK_TYPE_WCDMA = "WCDMA";
     public static final String NETWORK_TYPE_CDMA = "CDMA";
+    public static final String[] NETWORKS = {NETWORK_TYPE_LTE, NETWORK_TYPE_GSM, NETWORK_TYPE_WCDMA,
+            NETWORK_TYPE_CDMA};
 
     protected String mCellType; // LTE, GSM, WCDMA, or CDMA
     protected boolean mIsRegistered;
@@ -120,6 +125,14 @@ public class GeneralCellInfo {
 
     public String getCellType() {
         return mCellType;
+    }
+
+    public boolean isCellTypeKnown() {
+        ArrayList<String> networks = new ArrayList<String>();
+        for (String network : NETWORKS) {
+            networks.add(network);
+        }
+        return networks.contains(getCellType());
     }
 
     public boolean isRegistered() {
@@ -196,6 +209,17 @@ public class GeneralCellInfo {
         return Integer.MAX_VALUE;
     }
 
+    public int getAsuStrength() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN_MR1) {
+            if (mStrength == null) {
+                return Integer.MAX_VALUE;
+            }
+            return mStrength.getAsuLevel();
+        }
+        Log.e(TAG, "getAsuStrength: Unable to get ASU Level strength because SDK too low");
+        return Integer.MAX_VALUE;
+    }
+
     @Override
     public String toString() {
         final String unknown = "(UNKNOWN)";
@@ -205,11 +229,23 @@ public class GeneralCellInfo {
         sb.append("Type=").append(mCellType).append(" ");
         sb.append("CI/CID=").append(isIdentityKnown() ? mCellIdentity : unknown).append(" ");
         sb.append("MCC=").append(isMCCKnown() ? mMobileCountryCode : unknown).append(" ");
-        sb.append("MNC=").append(isMNCKnown() ? mMobileNetworkCode: unknown).append(" ");
+        sb.append("MNC=").append(isMNCKnown() ? mMobileNetworkCode : unknown).append(" ");
         sb.append("PSC/PCI=").append(isScramblingCodeKnown() ? mScramblingCode : unknown).append(" ");
         sb.append("LAC/TAC=").append(isAreaCodeKnown() ? mAreaCode: unknown).append(" ");
-        sb.append("Dbm=").append(isStrengthKnown() ? getDbmStrength() : unknown);
+        sb.append("Dbm=").append(isStrengthKnown() ? getDbmStrength() : unknown).append(" ");
+        sb.append("ASU=").append(isStrengthKnown() ? getAsuStrength() : unknown);
         sb.append("}");
         return sb.toString();
+    }
+
+    public boolean isFullyKnown() {
+        return isCellTypeKnown() && isMCCKnown() && isMNCKnown() && isAreaCodeKnown() && isIdentityKnown();
+    }
+
+    public String getFriendlyCellIdentity() {
+        if (isIdentityKnown()) {
+            return String.valueOf(getCellIdentity());
+        }
+        return "";
     }
 }
